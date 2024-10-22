@@ -42,14 +42,6 @@ contract SmartBuilderScore is Ownable {
     }
 
     /**
-     * @notice Disables the SmartBuilderScore contract.
-     * @dev Can only be called by the owner.
-     */
-    function setDisabled() public onlyOwner {
-        enabled = false;
-    }
-
-    /**
      * @notice Sets the cost of adding a score.
      * @param _cost The cost of adding a score.
      * @dev Can only be called by the owner.
@@ -77,20 +69,24 @@ contract SmartBuilderScore is Ownable {
         require(enabled, "Setting the Builder Score is disabled for this contract");
         // Ensure the caller has paid the required fee
         require(msg.value >= cost, "Insufficient payment");
-        // Hash the number
+
+        // Hash the score and passport ID together for unique signature verification
         bytes32 numberHash = keccak256(abi.encodePacked(score, passportId));
 
         // Recover the address that signed the hash
-        address signer = MessageHashUtils.toEthSignedMessageHash(numberHash).recover(signature);
+        address signer = numberHash.toEthSignedMessageHash().recover(signature);
 
         // Ensure the signer is the trusted signer
         require(signer == trustedSigner, "Invalid signature");
 
-        // Transfer fee to fee receiver
-        payable(feeReceiver).transfer(msg.value);
+        // Transfer fee to the fee receiver
+        (bool success, ) = payable(feeReceiver).call{value: msg.value}("");
+        require(success, "Fee transfer failed");
 
-        // Emit event
+        // Set the score for the passport ID in PassportBuilderScore contract
         require(passportBuilderScore.setScore(passportId, score), "Failed to set score");
+
+        // Emit the event for score set
         emit BuilderScoreSet(msg.sender, score, passportId);
     }
 }
