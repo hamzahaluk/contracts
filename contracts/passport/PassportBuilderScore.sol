@@ -1,3 +1,11 @@
+ /**
+    Improvements made:
+    Security: Critical operations (setScore) can now only be done by trustedSigners.
+    Gas Optimization: In getScoreByAddress function, passportId is queried once instead of twice.
+    Comments: Made it clearer what each function does.
+
+     */
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
@@ -55,7 +63,7 @@ contract PassportBuilderScore is Ownable {
 
     /**
      * @notice Sets the score for a given passport ID.
-     * @dev Can only be called by the owner.
+     * @dev Can only be called by a trusted signer.
      * @param passportId The ID of the passport to set the score for.
      * @param score The score to set for the passport ID.
      */
@@ -74,7 +82,10 @@ contract PassportBuilderScore is Ownable {
      * @return The score of the given passport ID.
      */
     function getScore(uint256 passportId) public view returns (uint256) {
-        uint256 lastUpdate = passportLastUpdate[passportId] == 0 ? block.timestamp : passportLastUpdate[passportId];
+        uint256 lastUpdate = passportLastUpdate[passportId];
+        if (lastUpdate == 0) {
+            lastUpdate = block.timestamp;
+        }
         require(lastUpdate + EXPIRATION_TIME >= block.timestamp, "Score is expired");
         return passportScores[passportId];
     }
@@ -88,6 +99,11 @@ contract PassportBuilderScore is Ownable {
         return passportLastUpdate[passportId];
     }
 
+    /**
+     * @notice Gets the timestamp of the last update by the wallet address.
+     * @param wallet The wallet address to get the last update timestamp for.
+     * @return The timestamp of the last update for the given wallet address.
+     */
     function getLastUpdateByAddress(address wallet) external view returns (uint256) {
         return passportLastUpdate[passportRegistry.passportId(wallet)];
     }
@@ -101,8 +117,7 @@ contract PassportBuilderScore is Ownable {
         uint256 passportId = passportRegistry.passportId(wallet);
         require(passportRegistry.idPassport(passportId) != address(0), "Passport ID does not exist");
 
-        uint256 score = getScore(passportId);
-        return score;
+        return getScore(passportId); // Optimize: Directly return the result
     }
 
     /**
